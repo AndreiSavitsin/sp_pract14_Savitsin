@@ -1,9 +1,11 @@
 ﻿#include <iostream>
 #include <Windows.h>
+#include <random>
+
 #define MAX_LOGS 1000
 #define MAX_TEXT 128
 
-#define USE_CRITICAL_SECTION
+
 
 struct LogRecord
 {
@@ -28,24 +30,30 @@ volatile LONG g_countT1 = 0;
 volatile LONG g_countT2 = 0;
 volatile LONG g_countT3 = 0;
 
+bool g_useCS = false;
+
 void Lock()
 {
-#ifdef USE_CRITICAL_SECTION
-    EnterCriticalSection(&g_cs);
-#endif
+    if (g_useCS)
+    {
+        EnterCriticalSection(&g_cs);
+    }
 }
 
 void Unlock()
 {
-#ifdef USE_CRITICAL_SECTION
-    LeaveCriticalSection(&g_cs);
-#endif
+    if (g_useCS)
+    {
+        LeaveCriticalSection(&g_cs);
+    }
 }
 
 DWORD WINAPI LoggerThread(LPVOID param)
 {
     const char* name = (const char*)param;
     int prior = GetThreadPriority(GetCurrentThread());
+
+    std::mt19937 mt(GetCurrentThreadId());
 
     while (g_stop == 0)
     {
@@ -67,7 +75,7 @@ DWORD WINAPI LoggerThread(LPVOID param)
 
         Unlock();
 
-        Sleep(10 + rand() % 91);
+        Sleep(10 + mt() % 91);
     }
 
     return 0;
@@ -104,6 +112,14 @@ int main()
     setlocale(LC_ALL, "Russian");
 
     srand(GetTickCount());
+
+    std::cout << "Выберите режим работы:\n";
+    std::cout << "1 - с критическими секциями\n";
+    std::cout << "0 - без критических секций\n";
+    int choice;
+    std::cin >> choice;
+
+    g_useCS = choice;
 
     SetProcessAffinityMask(GetCurrentProcess(), 1);
 
